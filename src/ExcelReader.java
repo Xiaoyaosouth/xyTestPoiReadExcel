@@ -1,8 +1,5 @@
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.*;
@@ -45,7 +42,7 @@ public class ExcelReader {
     /**
      * 将单元格内容转换为字符串
      *
-     * @param cell
+     * @param cell 单元格
      * @return
      */
     private static String convertCellValueToString(Cell cell) {
@@ -106,10 +103,8 @@ public class ExcelReader {
      * @param fileName 要读取的Excel文件所在路径
      */
     public static void readExcel(String fileName) {
-
         Workbook workbook = null;
         FileInputStream inputStream = null;
-
         try {
             // 获取Excel后缀名
             String fileType = fileName.substring(fileName.lastIndexOf(".") + 1, fileName.length());
@@ -118,13 +113,10 @@ public class ExcelReader {
             if (!excelFile.exists()) {
                 logger.warning("指定的Excel文件不存在！");
             }
-
             // 获取Excel工作簿
             inputStream = new FileInputStream(excelFile);
             workbook = getWorkbook(inputStream, fileType);
-
             readTable(workbook);
-
         } catch (Exception e) {
             logger.warning("解析Excel失败，文件名：" + fileName + " 错误信息：" + e.getMessage());
             //e.printStackTrace();
@@ -140,6 +132,64 @@ public class ExcelReader {
                 logger.warning("关闭数据流出错！错误信息：" + e.getMessage());
             }
         }
+    }
+
+    /**
+     * 将excel文件每一行数据转为的json字符串后放入ArrayList<>
+     * @param excelPath Excel文件的路径（支持xls、xlsx）
+     * @return ArrayList\<String\>
+     * @throws Exception
+     */
+    public static ArrayList<String> convertExcelToJson(String excelPath) throws Exception {
+        System.out.println("开始处理文件" + excelPath);
+        ArrayList<String> jsonString = new ArrayList<>();
+        //Excel工作簿
+        Workbook wb = WorkbookFactory.create(new FileInputStream(excelPath));
+        //sheet表格
+        Sheet sheet = wb.getSheetAt(0);
+        //标题
+        String[] headNames = null;
+        //每行
+        for (int i = 0; i < sheet.getPhysicalNumberOfRows(); i++) {
+            Row row = sheet.getRow(i);
+            System.out.println("——第" + (i + 1) + "行——");
+            if (i == 0) { // 第1行一般是标题
+                headNames = new String[row.getPhysicalNumberOfCells()];
+                //每列
+                for (int j = 0; j < row.getPhysicalNumberOfCells(); j++) {
+                    Cell cell = row.getCell(j); // 第j列
+                    //headNames[j] = cell.getStringCellValue(); // 取第1行第j列的值
+                    headNames[j] = convertCellValueToString(cell);
+                    System.out.print(convertCellValueToString(cell) + " ");
+                } // for end 获取标题结束
+                System.out.println();
+            }
+            // 当不是第1行
+            else {
+                StringBuilder stringBuilder = new StringBuilder(); // 用于保存JSON字符串
+                stringBuilder.append("{");
+                // 开始逐行逐列构造JSON
+                for (int j = 0; j < row.getPhysicalNumberOfCells(); j++) {
+                    Cell cell = row.getCell(j); // 当前单元格
+                    String key = headNames[j]; // 当前单元格value的key {"key":value}
+                    // String value = cell.getStringCellValue().replaceAll("[\\n\\r\"]", " "); // 取值并删除换行
+                    String value = convertCellValueToString(cell).replaceAll("[\\n\\r\"]", " ");
+                    System.out.print(value + " ");
+                    // {"key":value,"key":value},
+                    if (j != row.getPhysicalNumberOfCells() - 1) {
+                        // 如果不是第i行的最后一列，则添加","
+                        stringBuilder.append("\"").append(key).append("\"").append(":").append("\"").append(value).append("\"").append(",");
+                    } else {
+                        stringBuilder.append("\"").append(key).append("\"").append(":").append("\"").append(value).append("\"");
+                    }
+                } // for end 构造一行json数据完成
+                System.out.println();
+                stringBuilder.append("},"); // 每一行json尾部的"},"
+                jsonString.add(stringBuilder.toString()); // 将数据放入ArrayList<String>
+            }
+        } // for end 读取每一行完成
+        wb.close(); // 关闭工作簿
+        return jsonString;
     }
 
 }
